@@ -20,22 +20,20 @@ class ClearSession(Resource):
 class Signup(Resource):
 
     def post(self):
-        json = request.get_json()
-        user = User(username=json["username"])
-        user.password_hash = json["password"]
-        db.session.add(user)
-        db.session.commit()
-        return user.to_dict(), 201
+        data = request.get_json() if request.is_json else request.form
+        if data["username"] and data["password"]:
+            user = User(username=data["username"])
+            user.password_hash = data["password"]
+            db.session.add(user)
+            db.session.commit()
+            return user.to_dict(), 201
 
 
 class CheckSession(Resource):
-    pass
-
     def get(self):
-        if session["user_id"] and session["username"]:
+        if session["user_id"]:
             user_id = session["user_id"]
             user = User.query.filter_by(id=user_id).first()
-            print(user)
             return make_response(user.to_dict(), 200)
         else:
             return make_response({}, 204)
@@ -45,11 +43,10 @@ class Login(Resource):
     pass
 
     def post(self):
-        json = request.get_json()
-        user = User.query.filter_by(username=json["username"]).first()
-        if user and user.password_hash == json["password"]:
+        data = request.get_json() if request.is_json else request.form
+        user = User.query.filter_by(username=data["username"]).first()
+        if user.authenticate(data["password"]):
             session["user_id"] = user.id
-            session["username"] = user.username
             response = user.to_dict()
             return make_response(response, 200)
         else:
@@ -61,8 +58,8 @@ class Logout(Resource):
     pass
 
     def delete(self):
-        if session["user_id"] and session["username"]:
-            session.clear()
+        if session["user_id"]:
+            session["user_id"] = None
             return make_response({}, 204)
         else:
             return make_response({}, 204)
